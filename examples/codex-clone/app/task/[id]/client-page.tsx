@@ -7,7 +7,7 @@ import MessageInput from "./_components/message-input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchRealtimeSubscriptionToken } from "@/app/actions/inngest";
 import { useTaskStore } from "@/stores/tasks";
-import { Terminal, Bot, User, Loader2 } from "lucide-react";
+import { Terminal, Bot, User, Loader2, GitDiff } from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Markdown } from "@/components/markdown";
 import { StreamingIndicator } from "@/components/streaming-indicator";
@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface Props {
   id: string;
@@ -114,6 +115,9 @@ export default function TaskClientPage({ id }: Props) {
   const [streamingMessages, setStreamingMessages] = useState<
     Map<string, StreamingMessage>
   >(new Map());
+  const [activeTab, setActiveTab] = useState<"logs" | "diff">("logs");
+  const [diffText, setDiffText] = useState<string>("");
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
 
   // Function to get the output message for a given shell call message
   const getOutputForCall = (callId: string) => {
@@ -123,6 +127,26 @@ export default function TaskClientPage({ id }: Props) {
         message.data?.call_id === callId
     );
   };
+
+  // Fetch diff when diff view is selected and pull request exists
+  useEffect(() => {
+    if (activeTab === "diff" && task?.pullRequest && !diffText) {
+      setIsLoadingDiff(true);
+      (async () => {
+        const [owner, repo] = (task.repository || "").split("/");
+        const prNumber = task.pullRequest.number;
+        const res = await fetch(
+          `/api/diff?owner=${owner}&repo=${repo}&prNumber=${prNumber}`
+        );
+        if (res.ok) {
+          setDiffText(await res.text());
+        } else {
+          setDiffText(`Failed to fetch diff: ${res.status}`);
+        }
+        setIsLoadingDiff(false);
+      })();
+    }
+  }, [activeTab, task, diffText]);
 
   const { latestData } = useInngestSubscription({
     refreshToken: fetchRealtimeSubscriptionToken,
@@ -433,86 +457,99 @@ export default function TaskClientPage({ id }: Props) {
         </div>
 
         {/* Right panel for details */}
-        <div className="flex-1 bg-gradient-to-br from-muted/50 to-background relative">
+        <div className="flex-1 bg-gradient-to-br from-muted/50 to-background relative flex flex-col">
           {/* Fade overlay at the top */}
           <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-muted/50 to-transparent pointer-events-none z-10" />
-          <ScrollArea ref={scrollAreaRef} className="h-full scroll-area-custom">
-            <div className="max-w-4xl mx-auto w-full py-10 px-6">
-              {/* Details content will go here */}
-              <div className="flex flex-col gap-y-10">
-                {task?.messages.map((message) => {
-                  if (message.type === "local_shell_call") {
-                    const output = getOutputForCall(
-                      message.data?.call_id as string
-                    );
-                    return (
-                      <div
-                        key={message.data?.call_id as string}
-                        className="flex flex-col"
-                      >
-                        <div className="flex items-start gap-x-2">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <p className="font-medium font-mono text-sm -mt-1 truncate max-w-md cursor-help">
-                                  {(
-                                    message.data as {
-                                      action?: { command?: string[] };
-                                    }
-                                  )?.action?.command
-                                    ?.slice(1)
-                                    .join(" ")}
-                                </p>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="max-w-sm break-words">
-                                  {(
-                                    message.data as {
-                                      action?: { command?: string[] };
-                                    }
-                                  )?.action?.command
-                                    ?.slice(1)
-                                    .join(" ")}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                        {output && (
-                          <div className="mt-3 animate-in slide-in-from-bottom duration-300">
-                            <div className="rounded-xl bg-card border-2 border-border shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
-                              <div className="flex items-center gap-2 bg-muted/50 border-b px-4 py-3">
-                                <Terminal className="size-4 text-muted-foreground" />
-                                <span className="font-medium text-sm text-muted-foreground">
-                                  Output
-                                </span>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+            <TabsList className="border-b bg-muted/50 px-6">
+              <TabsTrigger value="logs">
+                <Terminal className="size-4" />
+                Logs
+              </TabsTrigger>
+              <TabsTrigger value="diff">
+                <GitDiff className="size-4" />
+                Diff
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="logs" className="flex-1 flex flex-col">
+              {task?.statusMessage && (
+                <div className="px-6 py-3 border-b bg-muted/50 flex items-center gap-2">
+                  <Terminal className="size-4 text-muted-foreground" />
+                  <span className="font-medium text-sm text-muted-foreground">
+                    {task.statusMessage}
+                  </span>
+                </div>
+              )}
+              <ScrollArea ref={scrollAreaRef} className="h-full scroll-area-custom">
+                <div className="max-w-4xl mx-auto w-full py-10 px-6">
+                  <div className="flex flex-col gap-y-10">
+                    {task?.messages.map((message) => {
+                      if (message.type === "local_shell_call") {
+                        const output = getOutputForCall(
+                          message.data?.call_id as string
+                        );
+                        return (
+                          <div
+                            key={message.data?.call_id as string}
+                            className="flex flex-col"
+                          >
+                            {output && (
+                              <div className="mt-3 animate-in slide-in-from-bottom duration-300">
+                                <div className="rounded-xl bg-card border-2 border-border shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
+                                  <div className="flex items-center gap-2 bg-muted/50 border-b px-4 py-3">
+                                    <Terminal className="size-4 text-muted-foreground" />
+                                    <span className="font-medium text-sm text-muted-foreground">
+                                      {(message.data as { action?: { command?: string[] } })
+                                        ?.action?.command
+                                        ?.slice(1)
+                                        .join(" ")}
+                                    </span>
+                                  </div>
+                                  <ScrollArea className="max-h-[400px]">
+                                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed p-4 text-muted-foreground">
+                                      {(() => {
+                                        try {
+                                          const parsed = JSON.parse(
+                                            (output.data as { output?: string })
+                                              ?.output || "{}"
+                                          );
+                                          return parsed.output || "No output";
+                                        } catch {
+                                          return "Failed to parse output";
+                                        }
+                                      })()}
+                                    </pre>
+                                  </ScrollArea>
+                                </div>
                               </div>
-                              <ScrollArea className="max-h-[400px]">
-                                <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed p-4 text-muted-foreground">
-                                  {(() => {
-                                    try {
-                                      const parsed = JSON.parse(
-                                        (output.data as { output?: string })
-                                          ?.output || "{}"
-                                      );
-                                      return parsed.output || "No output";
-                                    } catch {
-                                      return "Failed to parse output";
-                                    }
-                                  })()}
-                                </pre>
-                              </ScrollArea>
-                            </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            </div>
-          </ScrollArea>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="diff" className="flex-1 flex flex-col">
+              <ScrollArea className="h-full scroll-area-custom">
+                <div className="max-w-4xl mx-auto w-full py-10 px-6">
+                  {isLoadingDiff ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="animate-spin size-6 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-muted-foreground">
+                      {diffText || "No diff available"}
+                    </pre>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

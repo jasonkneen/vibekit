@@ -18,7 +18,7 @@ jobs:
           cache: 'npm'
       - run: npm install -g npm@latest
       - run: npm ci
-      - run: npm run type-check
+      - run: npm run type-check --workspaces
 
   test:
     name: Test
@@ -26,6 +26,8 @@ jobs:
     needs: lint
     env:
       E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
+      BEAM_API_KEY: ${{ secrets.BEAM_API_KEY }}
+      BEAM_WORKSPACE_ID: ${{ secrets.BEAM_WORKSPACE_ID }}
       DAYTONA_API_KEY: ${{ secrets.DAYTONA_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

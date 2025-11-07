@@ -33,6 +33,8 @@ export const skipIfNoDaytonaKeys = () =>
   skipIfNoAPIKeys(["DAYTONA_SERVER_API_KEY", "ANTHROPIC_API_KEY"]);
 export const skipIfNoBeamKeys = () =>
   skipIfNoAPIKeys(["BEAM_API_KEY", "BEAM_WORKSPACE_ID", "OPENAI_API_KEY"]);
+export const skipIfNoBlaxelKeys = () =>
+  skipIfNoAPIKeys(["ANTHROPIC_API_KEY", "BL_API_KEY", "BL_WORKSPACE"]);
 export const skipIfNoVibeKitKeys = () =>
   skipIfNoAPIKeys(["E2B_API_KEY", "ANTHROPIC_API_KEY", "GH_TOKEN"]);
 

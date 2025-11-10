@@ -57,6 +57,7 @@
             "group": "Supported Sandboxes",
             "pages": [
               "supported-sandboxes/beam",
+              "supported-sandboxes/blaxel",
               "supported-sandboxes/dagger",
               "supported-sandboxes/cloudflare",
               "supported-sandboxes/daytona",
